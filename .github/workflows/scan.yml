@@ -6,7 +6,7 @@ on:
         docker_image:
           description: 'The Docker image to scan'
           required: true
-          default: 'node:18-alpine'
+          default: 'bkimminich/juice-shop'
 
 jobs:
   scout:
