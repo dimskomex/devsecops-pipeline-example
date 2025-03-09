@@ -1,6 +1,4 @@
-## Scan a docker image -> get a SARIF/SBOM report
-
-name: SBOM/SCA Scout
+name: SBOM/SCA Scout with SAST for Node.js
 
 on:
   workflow_dispatch:
@@ -9,11 +7,6 @@ on:
           description: 'The Docker image to scan'
           required: true
           default: 'node:18-alpine'
-
-# env:
-#   REGISTRY: ghcr.io
-#   IMAGE_NAME: ${{ github.repository }}
-#   SHA: ${{ github.event.pull_request.head.sha || github.event.after }}
 
 jobs:
   scout:
@@ -33,13 +26,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    #   - name: Login to GHCR
-    #     uses: docker/login-action@v3
-    #     with:
-    #       registry: ${{ env.REGISTRY }}
-    #       username: ${{ github.actor }}
-    #       password: ${{ secrets.GITHUB_TOKEN }}
-
       # Pull the github input image or use the default
       - name: Pull the image
         run: docker pull ${{ github.event.inputs.docker_image }}
@@ -49,8 +35,6 @@ jobs:
         with:
           command: cves,recommendations,compare,sbom
           image: ${{ github.event.inputs.docker_image }}
-          #only-severities: critical,high # only show critical and high CVEs
-          #only-fixed: true # filter to fixed CVEs
           exit-code: false  # fail or not based on CVEs found?
           sarif-file: sca_scout.sarif
           output: sbom_scout.spdx.json
@@ -77,3 +61,30 @@ jobs:
 
       - name: SBOM upload
         uses: advanced-security/spdx-dependency-submission-action@v0.1.1
+
+  sast:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: 'javascript'     # Focus on JavaScript/Node.js
+          queries: security-extended  # Use the extended query suite for more thorough analysis
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: Security/SAST
+
+      - name: Upload SARIF file as an artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql_results.sarif
+          path: codeql_results.sarif
